@@ -40,7 +40,7 @@ class Camera:
     def __init__(self):
         self.position = Vec2() # x, y pos
         self.speed = 150
-        self.z = 1
+        self.z = 1.0
 
     def update(self, delta):
         global buttons
@@ -103,6 +103,12 @@ class Grid:
             self.decrease(px, py)
         
         self.field.remove((x, y))
+
+    def clear(self):
+        self.field.clear()
+        self.counts.clear()
+        self.to_reset.clear()
+        self.to_set.clear()
 
     def draw(self, width: int, height: int, camera: Camera):
         batch = pyglet.graphics.Batch()
@@ -187,10 +193,12 @@ class CellularAutomate:
         else:
             self.grid.set(px, py)
         
+    def clear(self):
+        self.grid.clear()
         
 class Window(pyglet.window.Window):
     def __init__(self):
-        super().__init__(caption="Cellular automates")
+        super().__init__(resizable=True, caption="Cellular automates")
         pyglet.gl.glClearColor(255, 255, 255, 255)
 
         self.camera = Camera()
@@ -223,7 +231,7 @@ class Window(pyglet.window.Window):
         pos = list(floor(self.camera.position))
 
         self.info.y = self.height
-        self.info.text = f"FPS: {fps}; \nPosition: {pos}; \nTime: x{self.time_scale}"
+        self.info.text = f"FPS: {fps}; \nPosition: {pos}; \nRunning: {self.state} \nTime: x{self.time_scale} \nZoom: x{self.camera.z}"
     
     def add_hoocks(self):
         pyglet.clock.schedule(self.update_info)
@@ -255,6 +263,8 @@ class Window(pyglet.window.Window):
             self.time_scale /= 2
             self.time_scale = clamp(self.time_scale, 0.25, 8.0)
             self.update_world_time_scale()
+        if symbol == 99:
+            self.automate.clear()
 
     def on_key_release(self, symbol, _modifiers):
         global buttons
@@ -264,15 +274,18 @@ class Window(pyglet.window.Window):
 
     def on_mouse_scroll(self, x, y, dx, dy):
         if dy > 0:
-            self.camera.z /= 2
+            self.camera.z -= 0.1
         else:
-            self.camera.z *= 2
+            self.camera.z += 0.1
 
-        self.camera.z = clamp(self.camera.z, 0.25, 2.0)
+        self.camera.z = round(self.camera.z, 1)
+
+        self.camera.z = clamp(self.camera.z, 0.5, 2.0)
         self.update_world_time_scale()
 
     def on_mouse_press(self, x, y, button, modifiers):
-        self.automate.pressed(self.camera, x, y)
+        if button == 1:
+            self.automate.pressed(self.camera, x, y)
 
     def on_draw(self):
         self.clear()
