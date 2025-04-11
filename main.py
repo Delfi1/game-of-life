@@ -63,7 +63,7 @@ class Grid:
 
         # render buffers
         self.lines = [None]*1000
-        self.cells_data = [None]*500
+        self.cells_data = [None]*10000
 
         self.to_set = list()
         self.to_reset = list()
@@ -192,7 +192,12 @@ class CellularAutomate:
             self.grid.reset(px, py)
         else:
             self.grid.set(px, py)
-        
+
+    def fill(self):
+        for y in range(-50, 50):
+            for x in range(-50, 50):
+                self.grid.set(x, y)
+
     def clear(self):
         self.grid.clear()
         
@@ -206,7 +211,7 @@ class Window(pyglet.window.Window):
         self.state = False
         # 12 / sec, delta = 1/12
         self.tick = 12
-        # X2, X-3, X-4, X-10, X-20
+        # X-0.25, X-0.5, X-1, X-2, X-4, X-8
         self.time_scale = 1.0
         self.add_hoocks()
         
@@ -265,6 +270,8 @@ class Window(pyglet.window.Window):
             self.update_world_time_scale()
         if symbol == 99:
             self.automate.clear()
+        if symbol == 102:
+            self.automate.fill()
 
     def on_key_release(self, symbol, _modifiers):
         global buttons
