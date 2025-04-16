@@ -2,8 +2,8 @@ import pyglet
 from pyglet.math import *
 from math import *
 
-GREEN = [0, 185, 0]
-GREY = [128, 128, 128]
+GREEN = (0, 185, 0)
+GREY = (128, 128, 128)
 
 def neighbours(x: int, y: int) -> list:
     return [
@@ -39,21 +39,22 @@ class Buttons:
 class Camera:
     def __init__(self):
         self.position = Vec2() # x, y pos
-        self.speed = 150
-        self.z = 1.0
+        self.speed = 600
+        self.z = 0.5
+        self.min_z, self.max_z = 0.25, 4.0
 
     def update(self, delta):
         global buttons
 
         # Wasd-movement
         if buttons.is_pressed(119):
-            self.position -= Vec3(0, self.speed * delta)
+            self.position -= Vec2(0, self.speed * delta / self.z)
         if buttons.is_pressed(97):
-            self.position += Vec3(self.speed * delta, 0)
+            self.position += Vec2(self.speed * delta / self.z, 0)
         if buttons.is_pressed(115):
-            self.position += Vec3(0, self.speed * delta)
+            self.position += Vec2(0, self.speed * delta / self.z)
         if buttons.is_pressed(100):
-            self.position -= Vec3(self.speed * delta, 0)
+            self.position -= Vec2(self.speed * delta / self.z, 0)
 
 class Grid:
     def __init__(self):
@@ -68,7 +69,7 @@ class Grid:
         self.to_set = list()
         self.to_reset = list()
 
-    # apply and clear buffers 
+    # apply and clear buffers
     def apply_buffers(self):
         for x, y in self.to_reset:
             self.reset(x, y)
@@ -83,7 +84,7 @@ class Grid:
         c = self.counts.get((x, y), 0)
 
         self.counts[(x, y)] = c + 1
-    
+
     def decrease(self, x: int, y: int):
         c = self.counts.get((x, y), 0) - 1
 
@@ -95,13 +96,13 @@ class Grid:
     def set(self, x: int, y: int):
         for px, py in neighbours(x, y):
             self.increase(px, py)
-        
+
         self.field.add((x, y))
 
     def reset(self, x: int, y: int):
         for px, py in neighbours(x, y):
             self.decrease(px, py)
-        
+
         self.field.remove((x, y))
 
     def clear(self):
@@ -110,20 +111,21 @@ class Grid:
         self.to_reset.clear()
         self.to_set.clear()
 
+    # TODO: Rewrite drawing method
     def draw(self, width: int, height: int, camera: Camera):
         batch = pyglet.graphics.Batch()
         step = self.cell/camera.z
         px, py = camera.position.x, camera.position.y
-        
+
         # Draw cells
         w = int(width // step)
         h = int(height // step)
         x0, y0 = int(px % step), int(py % step)
-        
+
         c = 0
         cx, cy = int(px // step), int(py // step)
-        for y in range(0, h+1):
-            for x in range(0, w+1):
+        for y in range(-1, h+1):
+            for x in range(-1, w+1):
                 if (x-cx, y-cy) in self.field:
                     self.cells_data[c] = pyglet.shapes.Rectangle(
                         x*step + x0, y*step + y0, step, step,
@@ -168,15 +170,15 @@ class CellularAutomate:
     def update(self):
         for x, y in self.grid.field:
             c = self.grid.counts.get((x, y), 0)
-            if c == 0 or c < 2 or c > 3: 
+            if c == 0 or c < 2 or c > 3:
                 self.grid.to_reset.append((x, y))
-        
+
         for x, y in self.grid.counts.keys():
             if self.grid.counts.get((x, y), 0) == 3 and (x, y) not in self.grid.field:
                 self.grid.to_set.append((x, y))
 
         self.grid.apply_buffers()
-        
+
 
     def draw(self, width: int, height: int, camera: Camera):
         self.grid.draw(width, height, camera)
@@ -200,7 +202,7 @@ class CellularAutomate:
 
     def clear(self):
         self.grid.clear()
-        
+
 class Window(pyglet.window.Window):
     def __init__(self):
         super().__init__(resizable=True, caption="Cellular automates")
@@ -211,10 +213,11 @@ class Window(pyglet.window.Window):
         self.state = False
         # 12 / sec, delta = 1/12
         self.tick = 12
+        self.ticks = 0 # ticks
         # X-0.25, X-0.5, X-1, X-2, X-4, X-8
         self.time_scale = 1.0
         self.add_hoocks()
-        
+
         self.info = pyglet.text.Label(
             '',
             0, self.height, 1.0,
@@ -230,14 +233,14 @@ class Window(pyglet.window.Window):
     def update_info(self, delta: float):
         try:
             fps = 1//delta
-        except: 
+        except:
             fps = 'N/A'
 
         pos = list(floor(self.camera.position))
 
         self.info.y = self.height
         self.info.text = f"FPS: {fps}; \nPosition: {pos}; \nRunning: {self.state} \nTime: x{self.time_scale} \nZoom: x{self.camera.z}"
-    
+
     def add_hoocks(self):
         pyglet.clock.schedule(self.update_info)
         pyglet.clock.schedule_interval(self.update, 1/(self.tick*self.time_scale))
@@ -249,11 +252,11 @@ class Window(pyglet.window.Window):
 
     def update(self, delta):
         if self.state:
-            self.automate.update()
+            self.ticks += 1
 
     def on_key_press(self, symbol, _modifiers):
         global buttons
-        
+
         if not(buttons.is_pressed(symbol)):
             buttons.just_pressed.add(symbol)
         buttons.pressed.add(symbol)
@@ -272,6 +275,9 @@ class Window(pyglet.window.Window):
             self.automate.clear()
         if symbol == 102:
             self.automate.fill()
+        if symbol == 65293:
+            if not(self.state):
+                self.ticks += 1
 
     def on_key_release(self, symbol, _modifiers):
         global buttons
@@ -287,7 +293,7 @@ class Window(pyglet.window.Window):
 
         self.camera.z = round(self.camera.z, 1)
 
-        self.camera.z = clamp(self.camera.z, 0.5, 2.0)
+        self.camera.z = clamp(self.camera.z, 0.25, 4.0)
         self.update_world_time_scale()
 
     def on_mouse_press(self, x, y, button, modifiers):
@@ -296,6 +302,11 @@ class Window(pyglet.window.Window):
 
     def on_draw(self):
         self.clear()
+
+        for i in range(self.ticks):
+            self.automate.update()
+
+        self.ticks = 0
         self.automate.draw(self.width, self.height, self.camera)
 
         self.info.draw()
